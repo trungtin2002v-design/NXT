@@ -8,6 +8,7 @@
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f8fafc; }
     .tab-active { border-bottom: 3px solid #2563eb; color: #1d4ed8; font-weight: 700; }
+    .cat-active { background-color: #2563eb; color: #ffffff; border-color: #2563eb; font-weight: 700; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
@@ -64,18 +65,25 @@
           <div>
             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Chọn sản phẩm sản xuất</label>
             <select id="prodSelect" onchange="renderProductionPreview()" class="w-full p-3 bg-slate-50 border border-slate-300 rounded-lg text-base font-semibold focus:ring-2 focus:ring-blue-500 outline-none"></select>
+            <div class="mt-2 px-3 py-2 bg-blue-50/70 border border-blue-200 rounded-lg flex items-center justify-between text-xs">
+              <span class="text-blue-900 font-medium">Tồn thành phẩm hiện tại:</span>
+              <div class="flex items-center gap-2">
+                <span id="finishedStockQty" class="text-sm font-extrabold text-blue-700">0 SP</span>
+                <button type="button" onclick="adjustFinishedStock()" class="px-2 py-0.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-[11px] font-bold">Sửa tồn TP</button>
+              </div>
+            </div>
             <div id="maxProdBox" class="mt-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between text-xs">
               <span class="text-emerald-800 font-medium">SX được tối đa theo tồn kho:</span>
               <div class="flex items-center gap-2">
-                <span id="maxProdQty" class="text-sm font-extrabold text-emerald-700">0</span>
+                <span id="maxProdQty" class="text-sm font-extrabold text-emerald-700">0 SP</span>
                 <button type="button" onclick="applyMaxProduction()" class="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-bold">Điền tối đa</button>
               </div>
             </div>
           </div>
           <div>
             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Số lượng SX hôm nay</label>
-            <input type="text" inputmode="decimal" id="prodQty" value="10" oninput="handleQtyInput(this)" class="w-full p-3 bg-slate-50 border border-slate-300 rounded-lg text-lg font-bold text-blue-700 focus:ring-2 focus:ring-blue-500 outline-none" />
-            <p class="text-[11px] text-slate-400 mt-1">Tự động định dạng dấu "." ngăn cách phần ngàn</p>
+            <input type="text" inputmode="numeric" id="prodQty" value="10" oninput="handleQtyInput(this)" class="w-full p-3 bg-slate-50 border border-slate-300 rounded-lg text-lg font-bold text-blue-700 focus:ring-2 focus:ring-blue-500 outline-none" />
+            <p class="text-[11px] text-slate-400 mt-1">Số nguyên, làm tròn xuống & ngăn cách dấu "." phần ngàn</p>
           </div>
         </div>
 
@@ -90,11 +98,11 @@
           </div>
         </div>
 
-        <!-- Bảng xem trước cấu phần tiêu hao (đã bỏ cột ĐM cho gọn) -->
+        <!-- Bảng xem trước cấu phần tiêu hao -->
         <div>
           <div class="flex items-center justify-between mb-2">
             <h2 class="text-xs font-bold text-slate-500 uppercase">Bảng tính cấu phần tiêu hao & Tồn sau SX</h2>
-            <span class="text-xs text-slate-400">Số liệu để ghi lên bảng</span>
+            <span class="text-xs text-slate-400">Làm tròn xuống số nguyên</span>
           </div>
           <div class="overflow-x-auto border border-slate-200 rounded-lg">
             <table class="w-full text-sm text-left">
@@ -112,24 +120,48 @@
         </div>
 
         <button id="btnSubmitProd" onclick="confirmProduction()" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-bold rounded-xl shadow-md text-base transition flex items-center justify-center gap-2">
-          ✅ Xác Nhận Xuất Kho & Cập Nhật Google Sheets
+          ✅ Xác Nhận SX (+Tồn TP, -Cấu Phần) & Lưu Sheets
         </button>
       </div>
     </section>
 
-    <!-- TAB 2: TỒN KHO CẤU PHẦN -->
+    <!-- TAB 2: TỒN KHO (THÀNH PHẨM + CẤU PHẦN THEO PHÂN LOẠI) -->
     <section id="view-inventory" class="hidden space-y-4">
       <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3">
         <div class="flex flex-wrap items-center justify-between gap-2">
-          <h2 class="font-bold text-base">Danh sách tồn kho cấu phần</h2>
-          <button onclick="openAddComponentModal()" class="px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg">+ Thêm cấu phần</button>
+          <h2 class="font-bold text-base">Quản lý Tồn Kho</h2>
+          <div class="flex items-center gap-2">
+            <button onclick="openAddCategoryModal()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg">+ Phân loại</button>
+            <button onclick="openAddComponentModal()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg">+ Thêm cấu phần</button>
+          </div>
         </div>
-        <!-- Thanh tìm kiếm cấu phần -->
+
+        <!-- Các mục con theo từng Phân loại (bao gồm Thành phẩm) -->
+        <div id="categoryTabs" class="flex gap-2 overflow-x-auto no-scrollbar pb-1"></div>
+
+        <!-- Thanh tìm kiếm -->
         <div class="relative">
-          <input type="text" id="inventorySearch" oninput="renderInventory()" placeholder="🔍 Tìm tên cấu phần hoặc đơn vị tính..." class="w-full pl-3 pr-8 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+          <input type="text" id="inventorySearch" oninput="renderInventory()" placeholder="🔍 Tìm tên thành phẩm, cấu phần hoặc đơn vị..." class="w-full pl-3 pr-8 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500" />
           <button type="button" onclick="clearInventorySearch()" id="btnClearSearch" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold">✕</button>
         </div>
-        <div id="inventoryList" class="divide-y divide-slate-200"></div>
+
+        <!-- Khu vực hiển thị Tồn Thành Phẩm -->
+        <div id="finishedInventoryBlock" class="space-y-2">
+          <div class="flex items-center justify-between bg-indigo-50 px-3 py-2 rounded-lg border border-indigo-100">
+            <span class="text-xs font-bold text-indigo-900 uppercase">🏭 Tồn kho Thành Phẩm</span>
+            <span id="finishedSectionCount" class="text-xs font-semibold text-indigo-700"></span>
+          </div>
+          <div id="finishedInventoryList" class="divide-y divide-slate-200"></div>
+        </div>
+
+        <!-- Khu vực hiển thị Tồn Cấu Phần -->
+        <div id="componentInventoryBlock" class="space-y-2">
+          <div id="componentSectionHeader" class="flex items-center justify-between bg-slate-100 px-3 py-2 rounded-lg">
+            <span class="text-xs font-bold text-slate-700 uppercase">📦 Tồn kho Cấu Phần</span>
+            <span id="componentSectionCount" class="text-xs font-semibold text-slate-600"></span>
+          </div>
+          <div id="inventoryList" class="divide-y divide-slate-200"></div>
+        </div>
       </div>
     </section>
 
@@ -145,7 +177,7 @@
           <select id="bomProdSelect" onchange="renderBomEditor()" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg font-semibold"></select>
         </div>
         <div class="text-xs text-slate-500 bg-blue-50 border border-blue-100 rounded-lg p-2.5">
-          💡 Hỗ trợ nhập công thức cộng hoặc phân số trực tiếp, ví dụ: <code>1+1/24</code>, <code>2 + 0,5</code> hoặc <code>1.000</code>.
+          💡 Hỗ trợ nhập công thức cộng hoặc phân số trực tiếp, ví dụ: <code>1+1/24</code>, <code>2 + 0,5</code> hoặc <code>1.000</code>. Khi tính tiêu hao sẽ tự làm tròn xuống số nguyên.
         </div>
         <div id="bomItemsContainer" class="space-y-2.5"></div>
         <div class="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
@@ -197,56 +229,67 @@
     // =========================================================================
 
     let SCRIPT_URL = localStorage.getItem("nxt_gas_url") || DEFAULT_SCRIPT_URL;
+    let selectedCategory = "Tất cả";
+
+    const DEFAULT_CATEGORIES = ["Thành phẩm", "Chai lọ", "Decal", "Thùng carton"];
 
     // Dữ liệu mặc định dự phòng khi mới khởi tạo
     let state = {
+      categories: [...DEFAULT_CATEGORIES],
       components: [
-        { id: "CP01", name: "Vỏ hộp nhựa A", unit: "Cái", stock: 1500, minStock: 100 },
-        { id: "CP02", name: "Bo mạch điều khiển", unit: "Cái", stock: 1250, minStock: 50 },
-        { id: "CP03", name: "Ốc vít M3", unit: "Con", stock: 12000, minStock: 300 },
-        { id: "CP04", name: "Tem nhãn", unit: "Cái", stock: 2600, minStock: 100 }
+        { id: "CP01", name: "Chai nhựa 500ml", unit: "Cái", category: "Chai lọ", stock: 1500, minStock: 100 },
+        { id: "CP02", name: "Tem nhãn SP A", unit: "Cái", category: "Decal", stock: 2600, minStock: 100 },
+        { id: "CP03", name: "Thùng carton 12 chai", unit: "Thùng", category: "Thùng carton", stock: 500, minStock: 50 },
+        { id: "CP04", name: "Nắp chai vặn", unit: "Cái", category: "Chai lọ", stock: 2000, minStock: 300 }
       ],
       products: [
         {
           id: "SP_A",
           name: "Sản phẩm A",
+          finishedStock: 120,
           bom: [
             { compId: "CP01", qty: 1, expr: "1" },
-            { compId: "CP02", qty: 1, expr: "1" },
-            { compId: "CP03", qty: 4, expr: "4" },
-            { compId: "CP04", qty: 1 + 1/24, expr: "1+1/24" }
+            { compId: "CP02", qty: 1 + 1/24, expr: "1+1/24" },
+            { compId: "CP03", qty: 1/12, expr: "1/12" },
+            { compId: "CP04", qty: 1, expr: "1" }
           ]
         },
         {
           id: "SP_B",
           name: "Sản phẩm B",
+          finishedStock: 80,
           bom: [
             { compId: "CP01", qty: 2, expr: "2" },
-            { compId: "CP03", qty: 6, expr: "6" },
-            { compId: "CP04", qty: 1, expr: "1" }
+            { compId: "CP04", qty: 2, expr: "2" }
           ]
         }
       ],
       history: []
     };
 
-    // Định dạng số kiểu Việt Nam: dấu "." ngăn cách phần ngàn, dấu "," thập phân
-    function formatNum(num, maxDecimals = 2) {
-      if (num === null || num === undefined || isNaN(num)) return "0";
-      const rounded = Math.round((Number(num) + Number.EPSILON) * Math.pow(10, maxDecimals)) / Math.pow(10, maxDecimals);
-      return rounded.toLocaleString("vi-VN", {
+    // Làm tròn xuống tới số nguyên (hỗ trợ cả số âm nếu có)
+    function floorInt(num) {
+      if (num === null || num === undefined || isNaN(num)) return 0;
+      const n = Number(num);
+      return n >= 0 ? Math.floor(n + 1e-9) : Math.ceil(n - 1e-9);
+    }
+
+    // Định dạng số nguyên kiểu Việt Nam: dấu "." ngăn cách phần ngàn
+    function formatNum(num) {
+      const val = floorInt(num);
+      return val.toLocaleString("vi-VN", {
         minimumFractionDigits: 0,
-        maximumFractionDigits: maxDecimals
+        maximumFractionDigits: 0
       });
     }
 
-    // Đọc chuỗi số có dấu "." ngăn cách phần ngàn (VD: "1.500" -> 1500, "1.500,5" -> 1500.5)
+    // Đọc chuỗi số có dấu "." ngăn cách phần ngàn và làm tròn xuống số nguyên
     function parseFormattedNum(str) {
-      if (typeof str === "number") return str;
+      if (typeof str === "number") return floorInt(str);
       if (!str) return 0;
       const cleaned = String(str).trim().replace(/\./g, "").replace(/,/g, ".");
       const val = parseFloat(cleaned);
-      return isNaN(val) ? 0 : val;
+      return isNaN(val) ? 0 : floorInt(val);
     }
 
     // Tính biểu thức định mức hỗ trợ phép cộng, trừ, nhân, chia (VD: "1+1/24", "2 + 0,5")
@@ -266,12 +309,23 @@
     }
 
     function handleQtyInput(inputEl) {
-      let raw = inputEl.value.replace(/[^0-9,]/g, "");
-      const parts = raw.split(",");
-      let intPart = parts[0].replace(/^0+(?=\d)/, "");
+      let raw = inputEl.value.replace(/[^0-9]/g, "");
+      let intPart = raw.replace(/^0+(?=\d)/, "");
       intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-      inputEl.value = parts.length > 1 ? intPart + "," + parts[1].slice(0, 2) : intPart;
+      inputEl.value = intPart;
       renderProductionPreview();
+    }
+
+    function ensureCategoriesSync() {
+      const catSet = new Set([...DEFAULT_CATEGORIES, ...(state.categories || [])]);
+      state.components.forEach(c => {
+        if (!c.category || !c.category.trim()) c.category = "Chai lọ";
+        catSet.add(c.category.trim());
+      });
+      state.categories = Array.from(catSet);
+      state.products.forEach(p => {
+        p.finishedStock = floorInt(p.finishedStock || 0);
+      });
     }
 
     function showToast(msg) {
@@ -305,6 +359,7 @@
       if (!SCRIPT_URL) {
         document.getElementById("setupBanner").classList.remove("hidden");
         setSyncStatus("err", "Chưa có link Google Sheets");
+        ensureCategoriesSync();
         renderAll();
         return;
       }
@@ -316,7 +371,9 @@
         if (data.status === "ok") {
           if (data.components && data.components.length > 0) state.components = data.components;
           if (data.products && data.products.length > 0) state.products = data.products;
+          if (data.categories && data.categories.length > 0) state.categories = data.categories;
           state.history = data.history || [];
+          ensureCategoriesSync();
           setSyncStatus("ok", "Đã đồng bộ Google Sheets");
           renderAll();
         } else {
@@ -326,6 +383,7 @@
         console.error(err);
         setSyncStatus("err", "Lỗi kết nối Google Sheets");
         showToast("⚠️ Không tải được dữ liệu từ Google Sheets");
+        ensureCategoriesSync();
         renderAll();
       }
     }
@@ -340,6 +398,7 @@
       try {
         const payload = {
           action: "saveAll",
+          categories: state.categories,
           components: state.components,
           products: state.products,
           newLog: logEntry || null
@@ -366,6 +425,7 @@
     }
 
     function renderAll() {
+      ensureCategoriesSync();
       const prodSelect = document.getElementById("prodSelect");
       const currentVal = prodSelect.value;
       prodSelect.innerHTML = state.products.map(p => `<option value="${p.id}">${p.name}</option>`).join("");
@@ -376,7 +436,7 @@
       renderHistory();
     }
 
-    // Tính số lượng sản phẩm tối đa có thể sản xuất từ tồn kho hiện tại
+    // Tính số lượng sản phẩm tối đa có thể sản xuất từ tồn kho hiện tại (làm tròn xuống số nguyên)
     function getMaxProducible(product) {
       if (!product || !product.bom || product.bom.length === 0) return 0;
       let maxQty = Infinity;
@@ -384,18 +444,73 @@
         const comp = state.components.find(c => c.id === item.compId);
         const unitNeed = item.expr ? evalBomExpression(item.expr) : Number(item.qty);
         if (!comp || !unitNeed || unitNeed <= 0) continue;
-        const possible = Math.floor(Math.max(0, comp.stock) / unitNeed);
+        const possible = floorInt(Math.max(0, floorInt(comp.stock)) / unitNeed);
         if (possible < maxQty) maxQty = possible;
       }
-      return maxQty === Infinity ? 0 : maxQty;
+      return maxQty === Infinity ? 0 : floorInt(maxQty);
     }
 
     function applyMaxProduction() {
       const prodId = document.getElementById("prodSelect").value;
       const product = state.products.find(p => p.id === prodId);
       const maxVal = getMaxProducible(product);
-      document.getElementById("prodQty").value = formatNum(maxVal, 0);
+      document.getElementById("prodQty").value = formatNum(maxVal);
       renderProductionPreview();
+    }
+
+    async function adjustFinishedStock(targetProdId) {
+      const prodId = targetProdId || document.getElementById("prodSelect").value;
+      const product = state.products.find(p => p.id === prodId);
+      if (!product) return;
+      const curStock = floorInt(product.finishedStock || 0);
+      const val = prompt(`Nhập tồn thành phẩm thực tế cho "${product.name}" (hiện tại: ${formatNum(curStock)}):`, formatNum(curStock));
+      if (val === null) return;
+      const nextStock = parseFormattedNum(val);
+      const diff = floorInt(nextStock - curStock);
+      product.finishedStock = nextStock;
+
+      const logEntry = {
+        id: "LOG_" + Date.now(),
+        time: new Date().toLocaleString("vi-VN"),
+        type: "TỒN THÀNH PHẨM",
+        productName: `${product.name} (Tồn TP: ${formatNum(nextStock)})`,
+        user: document.getElementById("prodUser").value.trim() || "Kiểm kho TP",
+        note: `Chênh lệch: ${diff >= 0 ? '+' + formatNum(diff) : formatNum(diff)} SP`,
+        summary: `Tồn thành phẩm ${product.name}: ${formatNum(nextStock)} SP`
+      };
+
+      if (await pushStateToServer("adjustFinished", logEntry)) {
+        showToast("✅ Đã cập nhật tồn thành phẩm!");
+        renderAll();
+      }
+    }
+
+    async function exportFinishedStock(prodId) {
+      const product = state.products.find(p => p.id === prodId);
+      if (!product) return;
+      const curStock = floorInt(product.finishedStock || 0);
+      const val = prompt(`Xuất bán / giao hàng thành phẩm "${product.name}" (tồn hiện tại: ${formatNum(curStock)} SP):`, "10");
+      if (val === null) return;
+      const outQty = parseFormattedNum(val);
+      if (!outQty || outQty <= 0) return;
+
+      const nextStock = floorInt(curStock - outQty);
+      product.finishedStock = nextStock;
+
+      const logEntry = {
+        id: "LOG_" + Date.now(),
+        time: new Date().toLocaleString("vi-VN"),
+        type: "XUẤT THÀNH PHẨM",
+        productName: `${product.name} (-${formatNum(outQty)} SP)`,
+        user: document.getElementById("prodUser").value.trim() || "Thủ kho TP",
+        note: "Xuất kho thành phẩm",
+        summary: `Tồn thành phẩm ${product.name} còn lại: ${formatNum(nextStock)} SP`
+      };
+
+      if (await pushStateToServer("exportFinished", logEntry)) {
+        showToast(`✅ Đã xuất -${formatNum(outQty)} ${product.name}`);
+        renderAll();
+      }
     }
 
     function renderProductionPreview() {
@@ -404,28 +519,43 @@
       const product = state.products.find(p => p.id === prodId);
       const tbody = document.getElementById("previewTableBody");
       const maxEl = document.getElementById("maxProdQty");
+      const finEl = document.getElementById("finishedStockQty");
 
       if (!product) {
         tbody.innerHTML = "";
-        maxEl.textContent = "0";
+        maxEl.textContent = "0 SP";
+        finEl.textContent = "0 SP";
         return;
       }
 
+      const curFinished = floorInt(product.finishedStock || 0);
+      const afterFinished = floorInt(curFinished + (qty > 0 ? qty : 0));
+      finEl.textContent = qty > 0
+        ? `${formatNum(curFinished)} → ${formatNum(afterFinished)} SP`
+        : `${formatNum(curFinished)} SP`;
+
       const maxProducible = getMaxProducible(product);
-      maxEl.textContent = formatNum(maxProducible, 0) + " SP";
+      maxEl.textContent = formatNum(maxProducible) + " SP";
 
       tbody.innerHTML = product.bom.map(item => {
         const comp = state.components.find(c => c.id === item.compId);
         if (!comp) return "";
         const unitNeed = item.expr ? evalBomExpression(item.expr) : Number(item.qty);
-        const needed = Math.round((unitNeed * qty + Number.EPSILON) * 100) / 100;
-        const remaining = Math.round((comp.stock - needed + Number.EPSILON) * 100) / 100;
+        const needed = floorInt(unitNeed * qty);
+        const curStock = floorInt(comp.stock);
+        const remaining = floorInt(curStock - needed);
         const isShort = remaining < 0;
         return `
           <tr class="${isShort ? 'bg-rose-50' : ''}">
-            <td class="py-2.5 px-3 font-medium">${comp.name} <span class="text-xs text-slate-400">(${comp.unit})</span></td>
+            <td class="py-2.5 px-3 font-medium">
+              <div>${comp.name} <span class="text-xs text-slate-400">(${comp.unit})</span></div>
+              <div class="text-[11px] text-slate-400">${comp.category || "Chai lọ"}</div>
+            </td>
             <td class="py-2.5 px-2 text-right font-semibold text-amber-700">-${formatNum(needed)}</td>
-            <td class="py-2.5 px-2 text-right">${formatNum(comp.stock)}</td>
+            <td class="py-2.5 px-2 text-right whitespace-nowrap">
+              <span>${formatNum(curStock)}</span>
+              <button type="button" onclick="editStockExact('${comp.id}')" title="Sửa tồn thực tế" class="ml-1 px-1.5 py-0.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-[11px] font-bold">Sửa</button>
+            </td>
             <td class="py-2.5 px-3 text-right font-bold text-base ${isShort ? 'text-rose-600 bg-rose-100' : 'text-blue-700 bg-blue-50'}">
               ${formatNum(remaining)}
             </td>
@@ -446,13 +576,20 @@
       const note = document.getElementById("prodNote").value.trim();
       const details = [];
 
+      const prevFinished = floorInt(product.finishedStock || 0);
+      const nextFinished = floorInt(prevFinished + qty);
+      product.finishedStock = nextFinished;
+      details.push(`Thành phẩm ${product.name}: +${formatNum(qty)} (tồn TP: ${formatNum(nextFinished)})`);
+
       product.bom.forEach(item => {
         const comp = state.components.find(c => c.id === item.compId);
         if (comp) {
           const unitNeed = item.expr ? evalBomExpression(item.expr) : Number(item.qty);
-          const used = Math.round((unitNeed * qty + Number.EPSILON) * 100) / 100;
-          comp.stock = Math.round((comp.stock - used + Number.EPSILON) * 100) / 100;
-          details.push(`${comp.name}: -${formatNum(used)} (còn ${formatNum(comp.stock)})`);
+          const used = floorInt(unitNeed * qty);
+          const curStock = floorInt(comp.stock);
+          const nextStock = floorInt(curStock - used);
+          comp.stock = nextStock;
+          details.push(`${comp.name}: -${formatNum(used)} (còn ${formatNum(nextStock)})`);
         }
       });
 
@@ -463,11 +600,7 @@
         productName: `${product.name} (SL: ${formatNum(qty)})`,
         user: user,
         note: note,
-        summary: details.join("\n"),
-        bomSnapshot: JSON.stringify(product.bom.map(b => {
-          const unitNeed = b.expr ? evalBomExpression(b.expr) : Number(b.qty);
-          return { compId: b.compId, delta: -(unitNeed * qty) };
-        }))
+        summary: details.join(" | ")
       };
 
       const btn = document.getElementById("btnSubmitProd");
@@ -476,11 +609,58 @@
 
       const ok = await pushStateToServer("produce", logEntry);
       btn.disabled = false;
-      btn.textContent = "✅ Xác Nhận Xuất Kho & Cập Nhật Google Sheets";
+      btn.textContent = "✅ Xác Nhận SX (+Tồn TP, -Cấu Phần) & Lưu Sheets";
 
       if (ok) {
-        showToast("✅ Đã trừ kho & lưu vào Google Sheets!");
+        showToast("✅ Đã cộng tồn TP, trừ cấu phần & lưu Google Sheets!");
         renderAll();
+      }
+    }
+
+    function selectCategory(catName) {
+      selectedCategory = catName;
+      renderInventory();
+    }
+
+    function renderCategoryTabs() {
+      const container = document.getElementById("categoryTabs");
+      if (!container) return;
+      const allCats = ["Tất cả", ...state.categories];
+      if (!allCats.includes(selectedCategory)) selectedCategory = "Tất cả";
+
+      container.innerHTML = allCats.map(cat => {
+        let count = 0;
+        if (cat === "Tất cả") {
+          count = state.products.length + state.components.length;
+        } else if (cat === "Thành phẩm") {
+          count = state.products.length + state.components.filter(c => c.category === "Thành phẩm").length;
+        } else {
+          count = state.components.filter(c => (c.category || "Chai lọ") === cat).length;
+        }
+        const active = selectedCategory === cat;
+        return `
+          <button type="button" onclick="selectCategory('${cat.replace(/'/g, "\\'")}')"
+            class="px-3 py-1.5 rounded-full text-xs border whitespace-nowrap transition ${active ? 'cat-active shadow-sm' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}">
+            ${cat} (${formatNum(count)})
+          </button>
+        `;
+      }).join("");
+    }
+
+    async function openAddCategoryModal() {
+      const catName = prompt("Nhập tên phân loại mới (VD: Bao bì, Phụ kiện, Nguyên liệu):");
+      if (!catName || !catName.trim()) return;
+      const trimmed = catName.trim();
+      if (!state.categories.includes(trimmed)) {
+        state.categories.push(trimmed);
+        selectedCategory = trimmed;
+        if (await pushStateToServer("addCat", null)) {
+          showToast(`✅ Đã thêm phân loại "${trimmed}"`);
+          renderAll();
+        }
+      } else {
+        selectedCategory = trimmed;
+        renderInventory();
       }
     }
 
@@ -490,7 +670,14 @@
     }
 
     function renderInventory() {
+      renderCategoryTabs();
       const container = document.getElementById("inventoryList");
+      const finBlock = document.getElementById("finishedInventoryBlock");
+      const finList = document.getElementById("finishedInventoryList");
+      const finCountEl = document.getElementById("finishedSectionCount");
+      const compBlock = document.getElementById("componentInventoryBlock");
+      const compHeader = document.getElementById("componentSectionHeader");
+      const compCountEl = document.getElementById("componentSectionCount");
       const searchInput = document.getElementById("inventorySearch");
       const clearBtn = document.getElementById("btnClearSearch");
       const keyword = (searchInput ? searchInput.value : "").trim().toLowerCase();
@@ -499,34 +686,113 @@
         clearBtn.classList.toggle("hidden", keyword.length === 0);
       }
 
-      const filtered = state.components.filter(c =>
-        c.name.toLowerCase().includes(keyword) || c.unit.toLowerCase().includes(keyword)
-      );
+      const showFinished = selectedCategory === "Tất cả" || selectedCategory === "Thành phẩm";
+      const filteredFinished = showFinished
+        ? state.products.filter(p => !keyword || p.name.toLowerCase().includes(keyword))
+        : [];
 
-      if (filtered.length === 0) {
-        container.innerHTML = `<p class="text-sm text-slate-400 text-center py-6">Không tìm thấy cấu phần nào phù hợp với "${searchInput.value}".</p>`;
-        return;
+      const filteredComponents = state.components.filter(c => {
+        const compCat = c.category || "Chai lọ";
+        const matchCat = selectedCategory === "Tất cả" || compCat === selectedCategory;
+        const matchText = !keyword ||
+          c.name.toLowerCase().includes(keyword) ||
+          c.unit.toLowerCase().includes(keyword) ||
+          compCat.toLowerCase().includes(keyword);
+        return matchCat && matchText;
+      });
+
+      if (showFinished) {
+        finBlock.classList.remove("hidden");
+        finCountEl.textContent = `${formatNum(filteredFinished.length)} mặt hàng`;
+        if (filteredFinished.length === 0) {
+          finList.innerHTML = `<p class="text-xs text-slate-400 text-center py-3">Không có thành phẩm nào khớp từ khóa.</p>`;
+        } else {
+          finList.innerHTML = filteredFinished.map(p => {
+            const finStock = floorInt(p.finishedStock || 0);
+            return `
+              <div class="py-3 flex items-center justify-between gap-2">
+                <div>
+                  <div class="font-bold text-sm flex flex-wrap items-center gap-1.5">
+                    <span>${p.name}</span>
+                    <span class="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] rounded-full font-semibold">Thành phẩm</span>
+                  </div>
+                  <div class="text-xs text-slate-500 mt-0.5">Đơn vị: SP · Có thể SX thêm tối đa: ${formatNum(getMaxProducible(p))} SP</div>
+                </div>
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <span class="text-lg font-extrabold ${finStock < 0 ? 'text-rose-600' : 'text-indigo-700'} mr-1.5">${formatNum(finStock)}</span>
+                  <button onclick="exportFinishedStock('${p.id}')" class="px-2.5 py-1.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg text-xs font-bold">- Xuất</button>
+                  <button onclick="adjustFinishedStock('${p.id}')" class="px-2.5 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-medium">Sửa</button>
+                </div>
+              </div>
+            `;
+          }).join("");
+        }
+      } else {
+        finBlock.classList.add("hidden");
       }
 
-      container.innerHTML = filtered.map(c => {
-        const low = c.stock <= c.minStock;
-        return `
-          <div class="py-3 flex items-center justify-between gap-2">
-            <div>
-              <div class="font-bold text-sm flex items-center gap-2">
-                <span>${c.name}</span>
-                ${low ? '<span class="px-1.5 py-0.5 bg-rose-100 text-rose-700 text-[10px] rounded font-bold">Sắp hết / Âm</span>' : ''}
+      const hideCompBlock = selectedCategory === "Thành phẩm" && filteredComponents.length === 0;
+      if (hideCompBlock) {
+        compBlock.classList.add("hidden");
+      } else {
+        compBlock.classList.remove("hidden");
+        compHeader.classList.toggle("hidden", selectedCategory !== "Tất cả");
+        compCountEl.textContent = `${formatNum(filteredComponents.length)} cấu phần`;
+
+        if (filteredComponents.length === 0) {
+          container.innerHTML = `<p class="text-sm text-slate-400 text-center py-6">Không có cấu phần nào trong phân loại "${selectedCategory}"${keyword ? ` khớp với "${searchInput.value}"` : ""}.</p>`;
+        } else {
+          container.innerHTML = filteredComponents.map(c => {
+            const stockInt = floorInt(c.stock);
+            const minInt = floorInt(c.minStock);
+            const low = stockInt <= minInt;
+            const compCat = c.category || "Chai lọ";
+            return `
+              <div class="py-3 flex items-center justify-between gap-2">
+                <div>
+                  <div class="font-bold text-sm flex flex-wrap items-center gap-1.5">
+                    <span>${c.name}</span>
+                    <span class="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 text-[10px] rounded-full font-semibold">${compCat}</span>
+                    ${low ? '<span class="px-1.5 py-0.5 bg-rose-100 text-rose-700 text-[10px] rounded font-bold">Sắp hết / Âm</span>' : ''}
+                  </div>
+                  <div class="text-xs text-slate-500 mt-0.5">Đơn vị: ${c.unit} · Tồn tối thiểu: ${formatNum(minInt)}</div>
+                </div>
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <span class="text-lg font-extrabold ${stockInt < 0 ? 'text-rose-600' : 'text-slate-800'} mr-1.5">${formatNum(stockInt)}</span>
+                  <button onclick="quickStockIn('${c.id}')" class="px-2.5 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold">+ Nhập</button>
+                  <button onclick="editStockExact('${c.id}')" class="px-2.5 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-medium">Sửa</button>
+                  <button onclick="changeComponentCategory('${c.id}')" class="px-2 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium" title="Đổi phân loại">Loại</button>
+                </div>
               </div>
-              <div class="text-xs text-slate-500">Đơn vị: ${c.unit} · Tồn tối thiểu: ${formatNum(c.minStock)}</div>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="text-lg font-extrabold ${c.stock < 0 ? 'text-rose-600' : 'text-slate-800'} mr-2">${formatNum(c.stock)}</span>
-              <button onclick="quickStockIn('${c.id}')" class="px-2.5 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold">+ Nhập</button>
-              <button onclick="editStockExact('${c.id}')" class="px-2.5 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-medium">Sửa</button>
-            </div>
-          </div>
-        `;
-      }).join("");
+            `;
+          }).join("");
+        }
+      }
+    }
+
+    async function changeComponentCategory(compId) {
+      const comp = state.components.find(c => c.id === compId);
+      if (!comp) return;
+      const optionsText = state.categories.map((cat, idx) => `${idx + 1}. ${cat}`).join("\n");
+      const choice = prompt(
+        `Chọn phân loại mới cho "${comp.name}" (hiện tại: ${comp.category || "Chai lọ"}):\n${optionsText}\n\nNhập số thứ tự hoặc tên phân loại mới:`,
+        comp.category || "Chai lọ"
+      );
+      if (!choice || !choice.trim()) return;
+      const trimmed = choice.trim();
+      const numIdx = parseInt(trimmed, 10);
+      let newCat = trimmed;
+      if (!isNaN(numIdx) && numIdx >= 1 && numIdx <= state.categories.length) {
+        newCat = state.categories[numIdx - 1];
+      }
+      if (!state.categories.includes(newCat)) {
+        state.categories.push(newCat);
+      }
+      comp.category = newCat;
+      if (await pushStateToServer("changeCat", null)) {
+        showToast(`✅ Đã chuyển "${comp.name}" sang "${newCat}"`);
+        renderAll();
+      }
     }
 
     async function quickStockIn(compId) {
@@ -537,16 +803,15 @@
       const add = parseFormattedNum(val);
       if (!add || add <= 0) return;
 
-      comp.stock = Math.round((comp.stock + add + Number.EPSILON) * 100) / 100;
+      comp.stock = floorInt(floorInt(comp.stock) + add);
       const logEntry = {
         id: "LOG_" + Date.now(),
         time: new Date().toLocaleString("vi-VN"),
         type: "NHẬP KHO",
         productName: `${comp.name} (+${formatNum(add)} ${comp.unit})`,
         user: document.getElementById("prodUser").value.trim() || "Thủ kho",
-        note: "Nhập bổ sung",
-        summary: `Tồn mới: ${formatNum(comp.stock)} ${comp.unit}`,
-        bomSnapshot: JSON.stringify([{ compId: comp.id, delta: add }])
+        note: `Phân loại: ${comp.category || "Chai lọ"}`,
+        summary: `Tồn mới: ${formatNum(comp.stock)} ${comp.unit}`
       };
       if (await pushStateToServer("stockIn", logEntry)) {
         showToast(`✅ Đã nhập +${formatNum(add)} ${comp.name}`);
@@ -557,11 +822,11 @@
     async function editStockExact(compId) {
       const comp = state.components.find(c => c.id === compId);
       if (!comp) return;
-      const val = prompt(`Chỉnh lại tồn thực tế cho "${comp.name}" (hiện tại: ${formatNum(comp.stock)}):`, formatNum(comp.stock));
+      const curStock = floorInt(comp.stock);
+      const val = prompt(`Chỉnh lại tồn thực tế cho "${comp.name}" (hiện tại: ${formatNum(curStock)}):`, formatNum(curStock));
       if (val === null) return;
       const exact = parseFormattedNum(val);
-      if (isNaN(exact)) return;
-      const diff = Math.round((exact - comp.stock + Number.EPSILON) * 100) / 100;
+      const diff = floorInt(exact - curStock);
       comp.stock = exact;
 
       const logEntry = {
@@ -571,8 +836,7 @@
         productName: `${comp.name} (Chỉnh về ${formatNum(exact)})`,
         user: document.getElementById("prodUser").value.trim() || "Kiểm kho",
         note: `Chênh lệch: ${diff >= 0 ? '+' + formatNum(diff) : formatNum(diff)}`,
-        summary: `Tồn sau kiểm kê: ${formatNum(exact)} ${comp.unit}`,
-        bomSnapshot: JSON.stringify([{ compId: comp.id, delta: diff }])
+        summary: `Tồn sau kiểm kê: ${formatNum(exact)} ${comp.unit}`
       };
       if (await pushStateToServer("adjust", logEntry)) {
         showToast("✅ Đã cập nhật kiểm kê!");
@@ -583,7 +847,24 @@
     async function openAddComponentModal() {
       const name = prompt("Tên cấu phần mới:");
       if (!name || !name.trim()) return;
-      const unit = prompt("Đơn vị tính (VD: Cái, Kg, Mét):", "Cái") || "Cái";
+
+      const catPrompt = `Chọn phân loại (${state.categories.map((cat, i) => `${i + 1}=${cat}`).join(", ")} hoặc gõ tên mới):`;
+      const catInput = prompt(catPrompt, selectedCategory !== "Tất cả" ? selectedCategory : "Chai lọ");
+      let category = "Chai lọ";
+      if (catInput && catInput.trim()) {
+        const trimmed = catInput.trim();
+        const idx = parseInt(trimmed, 10);
+        if (!isNaN(idx) && idx >= 1 && idx <= state.categories.length) {
+          category = state.categories[idx - 1];
+        } else {
+          category = trimmed;
+        }
+      }
+      if (!state.categories.includes(category)) {
+        state.categories.push(category);
+      }
+
+      const unit = prompt("Đơn vị tính (VD: Cái, Thùng, Chai):", "Cái") || "Cái";
       const stock = parseFormattedNum(prompt("Số lượng tồn ban đầu:", "0"));
       const minStock = parseFormattedNum(prompt("Mức cảnh báo tồn tối thiểu:", "50"));
 
@@ -591,6 +872,7 @@
         id: "CP_" + Date.now(),
         name: name.trim(),
         unit: unit.trim(),
+        category,
         stock,
         minStock
       });
@@ -603,7 +885,7 @@
     function renderBomTab() {
       const sel = document.getElementById("bomProdSelect");
       const cur = sel.value;
-      sel.innerHTML = state.products.map(p => `<option value="${p.id}">${p.name}</option>`).join("");
+      sel.innerHTML = state.products.map(p => `<option value="${p.id}">${p.name} (Tồn TP: ${formatNum(p.finishedStock || 0)})</option>`).join("");
       if (cur && state.products.some(p => p.id === cur)) sel.value = cur;
       renderBomEditor();
     }
@@ -616,7 +898,8 @@
         badge.textContent = "Lỗi công thức";
         badge.className = "bom-eval-badge text-[11px] font-bold text-rose-600";
       } else {
-        badge.textContent = "= " + formatNum(val, 4);
+        const rounded = Math.round((val + Number.EPSILON) * 10000) / 10000;
+        badge.textContent = "= " + rounded.toLocaleString("vi-VN", { maximumFractionDigits: 4 });
         badge.className = "bom-eval-badge text-[11px] font-semibold text-blue-600";
       }
     }
@@ -628,8 +911,11 @@
       if (!product) { box.innerHTML = ""; return; }
 
       box.innerHTML = product.bom.map((row, idx) => {
-        const displayExpr = row.expr ? row.expr : formatNum(row.qty, 4);
+        const displayExpr = row.expr ? row.expr : String(row.qty);
         const evaluated = evalBomExpression(displayExpr);
+        const evalText = isNaN(evaluated)
+          ? "Lỗi"
+          : (Math.round((evaluated + Number.EPSILON) * 10000) / 10000).toLocaleString("vi-VN", { maximumFractionDigits: 4 });
         return `
           <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
             <div class="flex items-center gap-2">
@@ -641,7 +927,7 @@
             <div class="flex items-center gap-2">
               <span class="text-xs text-slate-500 shrink-0">Định mức:</span>
               <input type="text" value="${displayExpr}" oninput="updateBomPreviewBadge(this)" placeholder="VD: 1+1/24" class="bom-qty flex-1 p-2 bg-white border border-slate-300 rounded-lg text-sm font-mono font-bold text-slate-800" />
-              <span class="bom-eval-badge text-[11px] font-semibold text-blue-600 shrink-0">= ${isNaN(evaluated) ? 'Lỗi' : formatNum(evaluated, 4)}</span>
+              <span class="bom-eval-badge text-[11px] font-semibold text-blue-600 shrink-0">= ${evalText}</span>
             </div>
           </div>
         `;
@@ -691,10 +977,12 @@
     async function createNewProduct() {
       const name = prompt("Tên sản phẩm mới (VD: Sản phẩm C):");
       if (!name || !name.trim()) return;
+      const initFin = parseFormattedNum(prompt("Tồn thành phẩm ban đầu:", "0"));
       const newId = "SP_" + Date.now();
       state.products.push({
         id: newId,
         name: name.trim(),
+        finishedStock: initFin,
         bom: state.components.length ? [{ compId: state.components[0].id, qty: 1, expr: "1" }] : []
       });
       if (await pushStateToServer("newProd", null)) {
@@ -738,12 +1026,17 @@
 
     function copyStockSummary() {
       const today = new Date().toLocaleDateString("vi-VN");
-      const lines = [`📊 TỒN KHO CẤU PHẦN (${today}):`];
+      const lines = [`📊 TỒN KHO (${today}):`];
+      lines.push("🏭 Thành phẩm:");
+      state.products.forEach(p => {
+        lines.push(`- ${p.name}: ${formatNum(p.finishedStock || 0)} SP`);
+      });
+      lines.push("📦 Cấu phần:");
       state.components.forEach(c => {
-        lines.push(`- ${c.name}: ${formatNum(c.stock)} ${c.unit}`);
+        lines.push(`- ${c.name} [${c.category || "Chai lọ"}]: ${formatNum(c.stock)} ${c.unit}`);
       });
       navigator.clipboard.writeText(lines.join("\n")).then(() => {
-        showToast("📋 Đã copy bảng tồn kho để dán vào Zalo!");
+        showToast("📋 Đã copy bảng tồn thành phẩm & cấu phần để dán vào Zalo!");
       });
     }
 
