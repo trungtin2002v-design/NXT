@@ -64,10 +64,18 @@
           <div>
             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Chọn sản phẩm sản xuất</label>
             <select id="prodSelect" onchange="renderProductionPreview()" class="w-full p-3 bg-slate-50 border border-slate-300 rounded-lg text-base font-semibold focus:ring-2 focus:ring-blue-500 outline-none"></select>
+            <div id="maxProdBox" class="mt-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between text-xs">
+              <span class="text-emerald-800 font-medium">SX được tối đa theo tồn kho:</span>
+              <div class="flex items-center gap-2">
+                <span id="maxProdQty" class="text-sm font-extrabold text-emerald-700">0</span>
+                <button type="button" onclick="applyMaxProduction()" class="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-bold">Điền tối đa</button>
+              </div>
+            </div>
           </div>
           <div>
             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Số lượng SX hôm nay</label>
-            <input type="number" id="prodQty" value="10" min="1" step="any" oninput="renderProductionPreview()" class="w-full p-3 bg-slate-50 border border-slate-300 rounded-lg text-lg font-bold text-blue-700 focus:ring-2 focus:ring-blue-500 outline-none" />
+            <input type="text" inputmode="decimal" id="prodQty" value="10" oninput="handleQtyInput(this)" class="w-full p-3 bg-slate-50 border border-slate-300 rounded-lg text-lg font-bold text-blue-700 focus:ring-2 focus:ring-blue-500 outline-none" />
+            <p class="text-[11px] text-slate-400 mt-1">Tự động định dạng dấu "." ngăn cách phần ngàn</p>
           </div>
         </div>
 
@@ -82,7 +90,7 @@
           </div>
         </div>
 
-        <!-- Bảng xem trước cấu phần tiêu hao -->
+        <!-- Bảng xem trước cấu phần tiêu hao (đã bỏ cột ĐM cho gọn) -->
         <div>
           <div class="flex items-center justify-between mb-2">
             <h2 class="text-xs font-bold text-slate-500 uppercase">Bảng tính cấu phần tiêu hao & Tồn sau SX</h2>
@@ -93,7 +101,6 @@
               <thead class="bg-slate-100 text-slate-600 text-xs uppercase">
                 <tr>
                   <th class="py-2.5 px-3">Cấu phần</th>
-                  <th class="py-2.5 px-2 text-right">ĐM</th>
                   <th class="py-2.5 px-2 text-right">Cần dùng</th>
                   <th class="py-2.5 px-2 text-right">Tồn hiện tại</th>
                   <th class="py-2.5 px-3 text-right bg-blue-50 text-blue-800">Tồn còn lại</th>
@@ -112,10 +119,15 @@
 
     <!-- TAB 2: TỒN KHO CẤU PHẦN -->
     <section id="view-inventory" class="hidden space-y-4">
-      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-2">
           <h2 class="font-bold text-base">Danh sách tồn kho cấu phần</h2>
           <button onclick="openAddComponentModal()" class="px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg">+ Thêm cấu phần</button>
+        </div>
+        <!-- Thanh tìm kiếm cấu phần -->
+        <div class="relative">
+          <input type="text" id="inventorySearch" oninput="renderInventory()" placeholder="🔍 Tìm tên cấu phần hoặc đơn vị tính..." class="w-full pl-3 pr-8 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+          <button type="button" onclick="clearInventorySearch()" id="btnClearSearch" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold">✕</button>
         </div>
         <div id="inventoryList" class="divide-y divide-slate-200"></div>
       </div>
@@ -132,7 +144,10 @@
           <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Chọn sản phẩm cần chỉnh định mức</label>
           <select id="bomProdSelect" onchange="renderBomEditor()" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg font-semibold"></select>
         </div>
-        <div id="bomItemsContainer" class="space-y-2"></div>
+        <div class="text-xs text-slate-500 bg-blue-50 border border-blue-100 rounded-lg p-2.5">
+          💡 Hỗ trợ nhập công thức cộng hoặc phân số trực tiếp, ví dụ: <code>1+1/24</code>, <code>2 + 0,5</code> hoặc <code>1.000</code>.
+        </div>
+        <div id="bomItemsContainer" class="space-y-2.5"></div>
         <div class="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
           <button onclick="addBomRow()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg">+ Thêm dòng cấu phần</button>
           <button onclick="saveBomChanges()" class="ml-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg">💾 Lưu Định Mức</button>
@@ -186,34 +201,80 @@
     // Dữ liệu mặc định dự phòng khi mới khởi tạo
     let state = {
       components: [
-        { id: "CP01", name: "Vỏ hộp nhựa A", unit: "Cái", stock: 500, minStock: 100 },
-        { id: "CP02", name: "Bo mạch điều khiển", unit: "Cái", stock: 250, minStock: 50 },
-        { id: "CP03", name: "Ốc vít M3", unit: "Con", stock: 2000, minStock: 300 },
-        { id: "CP04", name: "Tem nhãn", unit: "Cái", stock: 600, minStock: 100 }
+        { id: "CP01", name: "Vỏ hộp nhựa A", unit: "Cái", stock: 1500, minStock: 100 },
+        { id: "CP02", name: "Bo mạch điều khiển", unit: "Cái", stock: 1250, minStock: 50 },
+        { id: "CP03", name: "Ốc vít M3", unit: "Con", stock: 12000, minStock: 300 },
+        { id: "CP04", name: "Tem nhãn", unit: "Cái", stock: 2600, minStock: 100 }
       ],
       products: [
         {
           id: "SP_A",
           name: "Sản phẩm A",
           bom: [
-            { compId: "CP01", qty: 1 },
-            { compId: "CP02", qty: 1 },
-            { compId: "CP03", qty: 4 },
-            { compId: "CP04", qty: 1 }
+            { compId: "CP01", qty: 1, expr: "1" },
+            { compId: "CP02", qty: 1, expr: "1" },
+            { compId: "CP03", qty: 4, expr: "4" },
+            { compId: "CP04", qty: 1 + 1/24, expr: "1+1/24" }
           ]
         },
         {
           id: "SP_B",
           name: "Sản phẩm B",
           bom: [
-            { compId: "CP01", qty: 2 },
-            { compId: "CP03", qty: 6 },
-            { compId: "CP04", qty: 1 }
+            { compId: "CP01", qty: 2, expr: "2" },
+            { compId: "CP03", qty: 6, expr: "6" },
+            { compId: "CP04", qty: 1, expr: "1" }
           ]
         }
       ],
       history: []
     };
+
+    // Định dạng số kiểu Việt Nam: dấu "." ngăn cách phần ngàn, dấu "," thập phân
+    function formatNum(num, maxDecimals = 2) {
+      if (num === null || num === undefined || isNaN(num)) return "0";
+      const rounded = Math.round((Number(num) + Number.EPSILON) * Math.pow(10, maxDecimals)) / Math.pow(10, maxDecimals);
+      return rounded.toLocaleString("vi-VN", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: maxDecimals
+      });
+    }
+
+    // Đọc chuỗi số có dấu "." ngăn cách phần ngàn (VD: "1.500" -> 1500, "1.500,5" -> 1500.5)
+    function parseFormattedNum(str) {
+      if (typeof str === "number") return str;
+      if (!str) return 0;
+      const cleaned = String(str).trim().replace(/\./g, "").replace(/,/g, ".");
+      const val = parseFloat(cleaned);
+      return isNaN(val) ? 0 : val;
+    }
+
+    // Tính biểu thức định mức hỗ trợ phép cộng, trừ, nhân, chia (VD: "1+1/24", "2 + 0,5")
+    function evalBomExpression(rawInput) {
+      if (typeof rawInput === "number") return rawInput;
+      if (!rawInput) return 0;
+      let expr = String(rawInput).trim();
+      // Đổi dấu phẩy thập phân thành dấu chấm; nếu có dạng 1.000 (3 chữ số sau dấu chấm) thì bỏ dấu chấm ngàn
+      expr = expr.replace(/(\d)\.(\d{3})(?!\d)/g, "$1$2").replace(/,/g, ".");
+      // Chỉ cho phép số, khoảng trắng, dấu thập phân, dấu ngoặc và toán tử + - * /
+      if (!/^[0-9+\-*/().\s]+$/.test(expr)) return NaN;
+      try {
+        const result = Function('"use strict"; return (' + expr + ')')();
+        if (typeof result !== "number" || !isFinite(result)) return NaN;
+        return result;
+      } catch (e) {
+        return NaN;
+      }
+    }
+
+    function handleQtyInput(inputEl) {
+      let raw = inputEl.value.replace(/[^0-9,]/g, "");
+      const parts = raw.split(",");
+      let intPart = parts[0].replace(/^0+(?=\d)/, "");
+      intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+      inputEl.value = parts.length > 1 ? intPart + "," + parts[1].slice(0, 2) : intPart;
+      renderProductionPreview();
+    }
 
     function showToast(msg) {
       const el = document.getElementById("toast");
@@ -317,27 +378,58 @@
       renderHistory();
     }
 
+    // Tính số lượng sản phẩm tối đa có thể sản xuất từ tồn kho hiện tại
+    function getMaxProducible(product) {
+      if (!product || !product.bom || product.bom.length === 0) return 0;
+      let maxQty = Infinity;
+      for (const item of product.bom) {
+        const comp = state.components.find(c => c.id === item.compId);
+        const unitNeed = item.expr ? evalBomExpression(item.expr) : Number(item.qty);
+        if (!comp || !unitNeed || unitNeed <= 0) continue;
+        const possible = Math.floor(Math.max(0, comp.stock) / unitNeed);
+        if (possible < maxQty) maxQty = possible;
+      }
+      return maxQty === Infinity ? 0 : maxQty;
+    }
+
+    function applyMaxProduction() {
+      const prodId = document.getElementById("prodSelect").value;
+      const product = state.products.find(p => p.id === prodId);
+      const maxVal = getMaxProducible(product);
+      document.getElementById("prodQty").value = formatNum(maxVal, 0);
+      renderProductionPreview();
+    }
+
     function renderProductionPreview() {
       const prodId = document.getElementById("prodSelect").value;
-      const qty = parseFloat(document.getElementById("prodQty").value) || 0;
+      const qty = parseFormattedNum(document.getElementById("prodQty").value);
       const product = state.products.find(p => p.id === prodId);
       const tbody = document.getElementById("previewTableBody");
-      if (!product) { tbody.innerHTML = ""; return; }
+      const maxEl = document.getElementById("maxProdQty");
+
+      if (!product) {
+        tbody.innerHTML = "";
+        maxEl.textContent = "0";
+        return;
+      }
+
+      const maxProducible = getMaxProducible(product);
+      maxEl.textContent = formatNum(maxProducible, 0) + " SP";
 
       tbody.innerHTML = product.bom.map(item => {
         const comp = state.components.find(c => c.id === item.compId);
         if (!comp) return "";
-        const needed = +(item.qty * qty).toFixed(2);
-        const remaining = +(comp.stock - needed).toFixed(2);
+        const unitNeed = item.expr ? evalBomExpression(item.expr) : Number(item.qty);
+        const needed = Math.round((unitNeed * qty + Number.EPSILON) * 100) / 100;
+        const remaining = Math.round((comp.stock - needed + Number.EPSILON) * 100) / 100;
         const isShort = remaining < 0;
         return `
           <tr class="${isShort ? 'bg-rose-50' : ''}">
             <td class="py-2.5 px-3 font-medium">${comp.name} <span class="text-xs text-slate-400">(${comp.unit})</span></td>
-            <td class="py-2.5 px-2 text-right text-slate-500">${item.qty}</td>
-            <td class="py-2.5 px-2 text-right font-semibold text-amber-700">-${needed}</td>
-            <td class="py-2.5 px-2 text-right">${comp.stock}</td>
+            <td class="py-2.5 px-2 text-right font-semibold text-amber-700">-${formatNum(needed)}</td>
+            <td class="py-2.5 px-2 text-right">${formatNum(comp.stock)}</td>
             <td class="py-2.5 px-3 text-right font-bold text-base ${isShort ? 'text-rose-600 bg-rose-100' : 'text-blue-700 bg-blue-50'}">
-              ${remaining}
+              ${formatNum(remaining)}
             </td>
           </tr>
         `;
@@ -346,7 +438,7 @@
 
     async function confirmProduction() {
       const prodId = document.getElementById("prodSelect").value;
-      const qty = parseFloat(document.getElementById("prodQty").value) || 0;
+      const qty = parseFormattedNum(document.getElementById("prodQty").value);
       if (qty <= 0) { showToast("Vui lòng nhập số lượng > 0"); return; }
 
       const product = state.products.find(p => p.id === prodId);
@@ -359,9 +451,10 @@
       product.bom.forEach(item => {
         const comp = state.components.find(c => c.id === item.compId);
         if (comp) {
-          const used = +(item.qty * qty).toFixed(2);
-          comp.stock = +(comp.stock - used).toFixed(2);
-          details.push(`${comp.name}: -${used} (còn ${comp.stock})`);
+          const unitNeed = item.expr ? evalBomExpression(item.expr) : Number(item.qty);
+          const used = Math.round((unitNeed * qty + Number.EPSILON) * 100) / 100;
+          comp.stock = Math.round((comp.stock - used + Number.EPSILON) * 100) / 100;
+          details.push(`${comp.name}: -${formatNum(used)} (còn ${formatNum(comp.stock)})`);
         }
       });
 
@@ -369,11 +462,15 @@
         id: "LOG_" + Date.now(),
         time: new Date().toLocaleString("vi-VN"),
         type: "XUẤT SX",
-        productName: `${product.name} (SL: ${qty})`,
+        productName: `${product.name} (SL: ${formatNum(qty)})`,
         user: user,
         note: note,
-        summary: details.join(" | "),
-        bomSnapshot: JSON.stringify(product.bom.map(b => ({ compId: b.compId, delta: -(b.qty * qty) })))
+        summary: details.join("
+"),
+        bomSnapshot: JSON.stringify(product.bom.map(b => {
+          const unitNeed = b.expr ? evalBomExpression(b.expr) : Number(b.qty);
+          return { compId: b.compId, delta: -(unitNeed * qty) };
+        }))
       };
 
       const btn = document.getElementById("btnSubmitProd");
@@ -390,9 +487,31 @@
       }
     }
 
+    function clearInventorySearch() {
+      document.getElementById("inventorySearch").value = "";
+      renderInventory();
+    }
+
     function renderInventory() {
       const container = document.getElementById("inventoryList");
-      container.innerHTML = state.components.map(c => {
+      const searchInput = document.getElementById("inventorySearch");
+      const clearBtn = document.getElementById("btnClearSearch");
+      const keyword = (searchInput ? searchInput.value : "").trim().toLowerCase();
+
+      if (clearBtn) {
+        clearBtn.classList.toggle("hidden", keyword.length === 0);
+      }
+
+      const filtered = state.components.filter(c =>
+        c.name.toLowerCase().includes(keyword) || c.unit.toLowerCase().includes(keyword)
+      );
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<p class="text-sm text-slate-400 text-center py-6">Không tìm thấy cấu phần nào phù hợp với "${searchInput.value}".</p>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(c => {
         const low = c.stock <= c.minStock;
         return `
           <div class="py-3 flex items-center justify-between gap-2">
@@ -401,10 +520,10 @@
                 <span>${c.name}</span>
                 ${low ? '<span class="px-1.5 py-0.5 bg-rose-100 text-rose-700 text-[10px] rounded font-bold">Sắp hết / Âm</span>' : ''}
               </div>
-              <div class="text-xs text-slate-500">Đơn vị: ${c.unit} · Tồn tối thiểu: ${c.minStock}</div>
+              <div class="text-xs text-slate-500">Đơn vị: ${c.unit} · Tồn tối thiểu: ${formatNum(c.minStock)}</div>
             </div>
             <div class="flex items-center gap-2">
-              <span class="text-lg font-extrabold ${c.stock < 0 ? 'text-rose-600' : 'text-slate-800'} mr-2">${c.stock}</span>
+              <span class="text-lg font-extrabold ${c.stock < 0 ? 'text-rose-600' : 'text-slate-800'} mr-2">${formatNum(c.stock)}</span>
               <button onclick="quickStockIn('${c.id}')" class="px-2.5 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold">+ Nhập</button>
               <button onclick="editStockExact('${c.id}')" class="px-2.5 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-medium">Sửa</button>
             </div>
@@ -417,22 +536,23 @@
       const comp = state.components.find(c => c.id === compId);
       if (!comp) return;
       const val = prompt(`Nhập thêm số lượng cho "${comp.name}" (${comp.unit}):`, "100");
-      const add = parseFloat(val);
+      if (val === null) return;
+      const add = parseFormattedNum(val);
       if (!add || add <= 0) return;
 
-      comp.stock = +(comp.stock + add).toFixed(2);
+      comp.stock = Math.round((comp.stock + add + Number.EPSILON) * 100) / 100;
       const logEntry = {
         id: "LOG_" + Date.now(),
         time: new Date().toLocaleString("vi-VN"),
         type: "NHẬP KHO",
-        productName: `${comp.name} (+${add} ${comp.unit})`,
+        productName: `${comp.name} (+${formatNum(add)} ${comp.unit})`,
         user: document.getElementById("prodUser").value.trim() || "Thủ kho",
         note: "Nhập bổ sung",
-        summary: `Tồn mới: ${comp.stock} ${comp.unit}`,
+        summary: `Tồn mới: ${formatNum(comp.stock)} ${comp.unit}`,
         bomSnapshot: JSON.stringify([{ compId: comp.id, delta: add }])
       };
       if (await pushStateToServer("stockIn", logEntry)) {
-        showToast(`✅ Đã nhập +${add} ${comp.name}`);
+        showToast(`✅ Đã nhập +${formatNum(add)} ${comp.name}`);
         renderAll();
       }
     }
@@ -440,21 +560,21 @@
     async function editStockExact(compId) {
       const comp = state.components.find(c => c.id === compId);
       if (!comp) return;
-      const val = prompt(`Chỉnh lại tồn thực tế cho "${comp.name}" (hiện tại: ${comp.stock}):`, comp.stock);
+      const val = prompt(`Chỉnh lại tồn thực tế cho "${comp.name}" (hiện tại: ${formatNum(comp.stock)}):`, formatNum(comp.stock));
       if (val === null) return;
-      const exact = parseFloat(val);
+      const exact = parseFormattedNum(val);
       if (isNaN(exact)) return;
-      const diff = +(exact - comp.stock).toFixed(2);
+      const diff = Math.round((exact - comp.stock + Number.EPSILON) * 100) / 100;
       comp.stock = exact;
 
       const logEntry = {
         id: "LOG_" + Date.now(),
         time: new Date().toLocaleString("vi-VN"),
         type: "KIỂM KÊ",
-        productName: `${comp.name} (Chỉnh về ${exact})`,
+        productName: `${comp.name} (Chỉnh về ${formatNum(exact)})`,
         user: document.getElementById("prodUser").value.trim() || "Kiểm kho",
-        note: `Chênh lệch: ${diff >= 0 ? '+' + diff : diff}`,
-        summary: `Tồn sau kiểm kê: ${exact} ${comp.unit}`,
+        note: `Chênh lệch: ${diff >= 0 ? '+' + formatNum(diff) : formatNum(diff)}`,
+        summary: `Tồn sau kiểm kê: ${formatNum(exact)} ${comp.unit}`,
         bomSnapshot: JSON.stringify([{ compId: comp.id, delta: diff }])
       };
       if (await pushStateToServer("adjust", logEntry)) {
@@ -467,8 +587,8 @@
       const name = prompt("Tên cấu phần mới:");
       if (!name || !name.trim()) return;
       const unit = prompt("Đơn vị tính (VD: Cái, Kg, Mét):", "Cái") || "Cái";
-      const stock = parseFloat(prompt("Số lượng tồn ban đầu:", "0")) || 0;
-      const minStock = parseFloat(prompt("Mức cảnh báo tồn tối thiểu:", "50")) || 0;
+      const stock = parseFormattedNum(prompt("Số lượng tồn ban đầu:", "0"));
+      const minStock = parseFormattedNum(prompt("Mức cảnh báo tồn tối thiểu:", "50"));
 
       state.components.push({
         id: "CP_" + Date.now(),
@@ -491,28 +611,51 @@
       renderBomEditor();
     }
 
+    function updateBomPreviewBadge(inputEl) {
+      const badge = inputEl.parentElement.querySelector(".bom-eval-badge");
+      if (!badge) return;
+      const val = evalBomExpression(inputEl.value);
+      if (isNaN(val) || val <= 0) {
+        badge.textContent = "Lỗi công thức";
+        badge.className = "bom-eval-badge text-[11px] font-bold text-rose-600";
+      } else {
+        badge.textContent = "= " + formatNum(val, 4);
+        badge.className = "bom-eval-badge text-[11px] font-semibold text-blue-600";
+      }
+    }
+
     function renderBomEditor() {
       const prodId = document.getElementById("bomProdSelect").value;
       const product = state.products.find(p => p.id === prodId);
       const box = document.getElementById("bomItemsContainer");
       if (!product) { box.innerHTML = ""; return; }
 
-      box.innerHTML = product.bom.map((row, idx) => `
-        <div class="flex items-center gap-2">
-          <select data-idx="${idx}" class="bom-comp flex-1 p-2 bg-slate-50 border border-slate-300 rounded-lg text-sm">
-            ${state.components.map(c => `<option value="${c.id}" ${c.id === row.compId ? 'selected' : ''}>${c.name} (${c.unit})</option>`).join("")}
-          </select>
-          <input type="number" step="any" value="${row.qty}" class="bom-qty w-24 p-2 bg-slate-50 border border-slate-300 rounded-lg text-sm text-right font-bold" />
-          <button onclick="removeBomRow(${idx})" class="p-2 text-rose-600 font-bold">✕</button>
-        </div>
-      `).join("");
+      box.innerHTML = product.bom.map((row, idx) => {
+        const displayExpr = row.expr ? row.expr : formatNum(row.qty, 4);
+        const evaluated = evalBomExpression(displayExpr);
+        return `
+          <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
+            <div class="flex items-center gap-2">
+              <select data-idx="${idx}" class="bom-comp flex-1 p-2 bg-white border border-slate-300 rounded-lg text-sm">
+                ${state.components.map(c => `<option value="${c.id}" ${c.id === row.compId ? 'selected' : ''}>${c.name} (${c.unit})</option>`).join("")}
+              </select>
+              <button onclick="removeBomRow(${idx})" class="px-2.5 py-2 text-rose-600 hover:bg-rose-50 rounded-lg font-bold">✕</button>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-slate-500 shrink-0">Định mức:</span>
+              <input type="text" value="${displayExpr}" oninput="updateBomPreviewBadge(this)" placeholder="VD: 1+1/24" class="bom-qty flex-1 p-2 bg-white border border-slate-300 rounded-lg text-sm font-mono font-bold text-slate-800" />
+              <span class="bom-eval-badge text-[11px] font-semibold text-blue-600 shrink-0">= ${isNaN(evaluated) ? 'Lỗi' : formatNum(evaluated, 4)}</span>
+            </div>
+          </div>
+        `;
+      }).join("");
     }
 
     function addBomRow() {
       const prodId = document.getElementById("bomProdSelect").value;
       const product = state.products.find(p => p.id === prodId);
       if (!product || state.components.length === 0) return;
-      product.bom.push({ compId: state.components[0].id, qty: 1 });
+      product.bom.push({ compId: state.components[0].id, qty: 1, expr: "1" });
       renderBomEditor();
     }
 
@@ -532,10 +675,15 @@
       const compEls = document.querySelectorAll(".bom-comp");
       const qtyEls = document.querySelectorAll(".bom-qty");
       const newBom = [];
-      compEls.forEach((el, i) => {
-        const q = parseFloat(qtyEls[i].value) || 0;
-        if (q > 0) newBom.push({ compId: el.value, qty: q });
-      });
+      for (let i = 0; i < compEls.length; i++) {
+        const rawExpr = qtyEls[i].value.trim();
+        const q = evalBomExpression(rawExpr);
+        if (isNaN(q) || q <= 0) {
+          showToast(`⚠️ Công thức định mức "${rawExpr}" không hợp lệ!`);
+          return;
+        }
+        newBom.push({ compId: compEls[i].value, qty: q, expr: rawExpr });
+      }
       product.bom = newBom;
       if (await pushStateToServer("saveBom", null)) {
         showToast("✅ Đã lưu định mức lên Google Sheets");
@@ -550,7 +698,7 @@
       state.products.push({
         id: newId,
         name: name.trim(),
-        bom: state.components.length ? [{ compId: state.components[0].id, qty: 1 }] : []
+        bom: state.components.length ? [{ compId: state.components[0].id, qty: 1, expr: "1" }] : []
       });
       if (await pushStateToServer("newProd", null)) {
         renderAll();
@@ -560,6 +708,20 @@
       }
     }
 
+    function formatHistorySummary(summaryText) {
+      if (!summaryText) return "";
+      // Tách từng cấu phần xuống dòng kể cả với dữ liệu cũ dùng dấu " | " hoặc dữ liệu mới dùng "
+"
+      const lines = String(summaryText).split(/
+|\s*\|\s*/).filter(Boolean);
+      if (lines.length <= 1) {
+        return `<div class="text-slate-700">${lines[0] || ""}</div>`;
+      }
+      return `<ul class="space-y-1 text-slate-700 pl-3 border-l-2 border-blue-200 mt-1">` +
+        lines.map(line => `<li class="leading-snug">• ${line}</li>`).join("") +
+        `</ul>`;
+    }
+
     function renderHistory() {
       const list = document.getElementById("historyList");
       if (!state.history || state.history.length === 0) {
@@ -567,13 +729,13 @@
         return;
       }
       list.innerHTML = state.history.slice().reverse().map(h => `
-        <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1">
-          <div class="flex items-center justify-between">
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1.5">
+          <div class="flex items-center justify-between gap-2">
             <span class="font-bold text-blue-700">[${h.type}] ${h.productName}</span>
-            <span class="text-slate-400">${h.time}</span>
+            <span class="text-slate-400 shrink-0">${h.time}</span>
           </div>
-          <div class="text-slate-700">${h.summary}</div>
-          <div class="text-slate-500 flex justify-between">
+          ${formatHistorySummary(h.summary)}
+          <div class="text-slate-500 pt-1 border-t border-slate-200/70 flex justify-between">
             <span>Người làm: <b>${h.user}</b> ${h.note ? '· ' + h.note : ''}</span>
           </div>
         </div>
@@ -584,9 +746,10 @@
       const today = new Date().toLocaleDateString("vi-VN");
       const lines = [`📊 TỒN KHO CẤU PHẦN (${today}):`];
       state.components.forEach(c => {
-        lines.push(`- ${c.name}: ${c.stock} ${c.unit}`);
+        lines.push(`- ${c.name}: ${formatNum(c.stock)} ${c.unit}`);
       });
-      navigator.clipboard.writeText(lines.join("\n")).then(() => {
+      navigator.clipboard.writeText(lines.join("
+")).then(() => {
         showToast("📋 Đã copy bảng tồn kho để dán vào Zalo!");
       });
     }
