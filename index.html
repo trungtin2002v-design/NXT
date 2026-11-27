@@ -193,7 +193,7 @@
     // =========================================================================
     // DÁN LINK GOOGLE APPS SCRIPT WEB APP CỦA BẠN VÀO DẤU NGOẶC KÉP BÊN DƯỚI
     // ĐỂ MỌI NGƯỜI MỞ LINK LÀ DÙNG ĐƯỢC NGAY MÀ KHÔNG CẦN TỰ NHẬP LẠI:
-    const DEFAULT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbywksU4exyUMqHa9WmKs5pWMl-8gwMf3eH1xwi-ve8/dev";
+    const DEFAULT_SCRIPT_URL = "";
     // =========================================================================
 
     let SCRIPT_URL = localStorage.getItem("nxt_gas_url") || DEFAULT_SCRIPT_URL;
@@ -254,9 +254,7 @@
       if (typeof rawInput === "number") return rawInput;
       if (!rawInput) return 0;
       let expr = String(rawInput).trim();
-      // Đổi dấu phẩy thập phân thành dấu chấm; nếu có dạng 1.000 (3 chữ số sau dấu chấm) thì bỏ dấu chấm ngàn
       expr = expr.replace(/(\d)\.(\d{3})(?!\d)/g, "$1$2").replace(/,/g, ".");
-      // Chỉ cho phép số, khoảng trắng, dấu thập phân, dấu ngoặc và toán tử + - * /
       if (!/^[0-9+\-*/().\s]+$/.test(expr)) return NaN;
       try {
         const result = Function('"use strict"; return (' + expr + ')')();
@@ -465,8 +463,7 @@
         productName: `${product.name} (SL: ${formatNum(qty)})`,
         user: user,
         note: note,
-        summary: details.join("
-"),
+        summary: details.join("\n"),
         bomSnapshot: JSON.stringify(product.bom.map(b => {
           const unitNeed = b.expr ? evalBomExpression(b.expr) : Number(b.qty);
           return { compId: b.compId, delta: -(unitNeed * qty) };
@@ -710,10 +707,7 @@
 
     function formatHistorySummary(summaryText) {
       if (!summaryText) return "";
-      // Tách từng cấu phần xuống dòng kể cả với dữ liệu cũ dùng dấu " | " hoặc dữ liệu mới dùng "
-"
-      const lines = String(summaryText).split(/
-|\s*\|\s*/).filter(Boolean);
+      const lines = String(summaryText).split(/\n|\s*\|\s*/).filter(Boolean);
       if (lines.length <= 1) {
         return `<div class="text-slate-700">${lines[0] || ""}</div>`;
       }
@@ -748,8 +742,7 @@
       state.components.forEach(c => {
         lines.push(`- ${c.name}: ${formatNum(c.stock)} ${c.unit}`);
       });
-      navigator.clipboard.writeText(lines.join("
-")).then(() => {
+      navigator.clipboard.writeText(lines.join("\n")).then(() => {
         showToast("📋 Đã copy bảng tồn kho để dán vào Zalo!");
       });
     }
